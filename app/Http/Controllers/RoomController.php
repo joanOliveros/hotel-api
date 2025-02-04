@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Room;
 use Illuminate\Http\Request;
 use App\Docs\RoomDocs;
+use App\Models\Hotel;
 
 class RoomController extends Controller
 {
@@ -28,9 +29,31 @@ class RoomController extends Controller
             'quantity' => 'required|integer|min:1'
         ]);
 
+        $hotel = Hotel::find($request->hotel_id);
+
+        // criterios de aceptacion
+        // Validar que la cantidad de habitaciones no supere el máximo del hotel
+        $total_rooms_assigned = Room::where('hotel_id', $hotel->id)->sum('quantity');
+
+        if ($total_rooms_assigned + $request->quantity > $hotel->total_rooms) {
+            return response()->json(['error' => 'La cantidad de habitaciones supera el máximo permitido para este hotel'], 400);
+        }
+
+        // Validar que no exista una combinación duplicada de room_type + accommodation en el mismo hotel
+        $exists = Room::where('hotel_id', $request->hotel_id)
+                    ->where('room_type_id', $request->room_type_id)
+                    ->where('accommodation_id', $request->accommodation_id)
+                    ->exists();
+
+        if ($exists) {
+            return response()->json(['error' => 'Este tipo de habitación y acomodación ya está asignado al hotel'], 400);
+        }
+
         $room = Room::create($request->all());
+
         return response()->json($room, 201);
     }
+
 
     /**
      * Display the specified resource.
